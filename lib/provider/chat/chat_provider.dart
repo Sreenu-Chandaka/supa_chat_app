@@ -93,7 +93,7 @@ class ChatProvider extends ChangeNotifier {
   Stream<List<MessageData>>? get sMessages => _sMessages;
 
   void getMessages(String roomId){
-    _sMessages = _repo.getMessages(roomId);
+    _sMessages = _repo.getMessages(roomId).map((messages) => messages.reversed.toList());
     notifyListeners();
   }
 }

@@ -9,7 +9,6 @@ import '../../data/models/chat/room/room_data.dart';
 import '../../provider/chat/chat_provider.dart';
 import '../../widget/chat_receiver_card.dart';
 import '../../widget/chat_sender_card.dart';
-import '../../widget/sliver_sized_box.dart';
 
 
 class RoomScreen extends StatelessWidget {
@@ -33,7 +32,7 @@ class RoomScreen extends StatelessWidget {
 }
 
 class RoomView extends StatefulWidget {
-  const RoomView({super.key, required this.roomData});
+  const RoomView({Key? key, required this.roomData});
 
   final RoomData roomData;
 
@@ -44,11 +43,14 @@ class RoomView extends StatefulWidget {
 class _RoomViewState extends State<RoomView> {
   late ChatProvider chatProvider;
   late TextEditingController txtMessage;
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     chatProvider = Provider.of(context, listen: false);
     txtMessage = TextEditingController();
+    _scrollController = ScrollController();
+   
     super.initState();
 
     Future.delayed(const Duration(milliseconds: 320), () {
@@ -57,67 +59,68 @@ class _RoomViewState extends State<RoomView> {
     });
   }
 
+
+
   @override
   Widget build(BuildContext context) {
-    Size size = MediaQuery.of(context).size;
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverSizedBox(
-            height: size.height,
-            child: Column(
-              children: [
-                ///appbar
-                buildRoomAppBar(context),
-                Expanded(
-                  child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: kDefault),
-                      color: Colors.grey.withOpacity(.06),
-                      child: Consumer<ChatProvider>(
-                        builder: (context, value, child) {
-                          return StreamBuilder<List<MessageData>>(
-                            stream: value.sMessages,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.active) {
-                                return ListView.builder(
-                                  physics: const BouncingScrollPhysics(),
-                                  itemCount: snapshot.data?.length ?? 0,
-                                  itemBuilder: (context, index) {
-                                    return snapshot.data?[index].senderId ==
-                                            widget.roomData.receiverId
-                                        ///check sender or receiver type for message
-                                        ? 
-                                        ChatCardReceiver(
-                                            message: snapshot.data?[index],
-                                            currentUser:value.userData,
-                                             
-                                          ):
-                                          ChatCardSender(
-                                            message: snapshot.data?[index],
-                                            room: widget.roomData,
-                                          );
-                                  },
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
+      
+       resizeToAvoidBottomInset: true,
+      
+      body: Column(
+        children: [
+          buildRoomAppBar(context),
+          Expanded(
+            child: CustomScrollView(
+              reverse: true,
+              controller: _scrollController,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  sliver: Consumer<ChatProvider>(
+                    builder: (context, value, child) {
+                      return StreamBuilder<List<MessageData>>(
+                        stream: value.sMessages,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.active) {
+                            return SliverList(
+                              
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  return snapshot.data![index].senderId ==
+                                          widget.roomData.receiverId
+                                      ? ChatCardReceiver(
+                                          message: snapshot.data![index],
+                                          currentUser: value.userData,
+                                        )
+                                      : ChatCardSender(
+                                          message: snapshot.data![index],
+                                          room: widget.roomData,
+                                        );
+                                },
+                                childCount: snapshot.data!.length,
+                              ),
+                            );
+                          }
+                          return const SliverToBoxAdapter(
+                            child: SizedBox.shrink(),
                           );
                         },
-                      )),
+                      );
+                    },
+                  ),
                 ),
-
-                ///bottom message input
-                buildMessageInputBox(context)
+                
               ],
             ),
-          )
+
+          ),
+          buildMessageInputBox(context),
         ],
       ),
     );
   }
-
   Container buildMessageInputBox(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(
@@ -138,9 +141,11 @@ class _RoomViewState extends State<RoomView> {
                   borderRadius: BorderRadius.circular(kDefault),
                 ),
                 child: TextFormField(
+                
                   controller: txtMessage,
                   enabled: value.isEnableMessage,
-                  onChanged: (it) => chatProvider.messageChange(it),
+                  onChanged: (it) {
+                  chatProvider.messageChange(it);} ,
                   onFieldSubmitted: (it){
                     ///disable message input box
                     chatProvider.enableMessageBoxChange(false);
@@ -164,7 +169,7 @@ class _RoomViewState extends State<RoomView> {
                    txtMessage.clear();
                   },
                   decoration: const InputDecoration(
-                      hintText: '    A ...',
+                      hintText: '    Type a msg...',
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -183,7 +188,9 @@ class _RoomViewState extends State<RoomView> {
                   '${widget.roomData.roomId}', '${widget.roomData.senderId}',
                   success: () {
                 ///enable message input box
+               
                 chatProvider.enableMessageBoxChange(true);
+               
               }, failure: () {
                 ///show snackbar
                 ScaffoldMessenger.of(context).showSnackBar(
